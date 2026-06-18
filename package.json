@@ -1,0 +1,12 @@
+{
+  "name": "mf-flow-crypto-helper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Node.js sidecar for Edelweiss (mf13) hybrid-crypto-js RSA-OAEP encryption. Python can't replicate node-forge's RSA public-key fingerprint, so the scraper shells out to `node` to encrypt POST bodies. Not used by any other scraper.",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "hybrid-crypto-js": "^0.2.4"
+  }
+}

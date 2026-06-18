@@ -1,0 +1,72 @@
+"""mf42 Trust v5b - Parse the GetData API response for monthly portfolio files."""
+import json
+from playwright.sync_api import sync_playwright
+
+disclosure_data = []
+
+with sync_playwright() as p:
+    b = p.chromium.launch(headless=True)
+    page = b.new_page()
+
+    def capture(response):
+        global disclosure_data
+        url = response.url
+        ct = response.headers.get('content-type', '')
+        if 'GetData' in url and 'json' in ct:
+            try:
+                data = response.json()
+                arr = data.get('resultSetArray', [])
+                if arr and isinstance(arr[0], dict) and 'fileurl' in arr[0] and 'title' in arr[0]:
+                    disclosure_data = arr
+            except:
+                pass
+
+    page.on('response', capture)
+    page.goto('https://www.trustmf.com/disclosures?activeTab=portfolio-disclosures', wait_until='domcontentloaded', timeout=60000)
+    try:
+        page.wait_for_load_state('networkidle', timeout=20000)
+    except:
+        pass
+    page.wait_for_timeout(5000)
+
+    out = {}
+
+    if disclosure_data:
+        # Filter to monthly portfolio items by title
+        monthly_items = [
+            item for item in disclosure_data
+            if 'monthly' in item.get('title', '').lower()
+            and 'portfolio' in item.get('title', '').lower()
+        ]
+        out['monthly_items'] = monthly_items[:10]
+
+        # Filter by matching_slugs
+        portfolio_monthly = [
+            item for item in disclosure_data
+            if 'portfolio-monthly-disclosure' in item.get('matching_slugs', '')
+        ]
+        out['portfolio_monthly_by_slug'] = portfolio_monthly[:10]
+
+        # Get ALL unique matching_slugs
+        slugs = set()
+        for item in disclosure_data:
+            for s in item.get('matching_slugs', '').split(','):
+                if s.strip():
+                    slugs.add(s.strip())
+        out['unique_slugs'] = sorted(slugs)
+        out['total_items'] = len(disclosure_data)
+    else:
+        out['no_disclosure_data'] = True
+
+    b.close()
+
+with open('tools/probe_out/mf42_v5.json', 'w') as f:
+    json.dump(out, f, indent=2, default=str)
+
+print('DONE mf42 v5b')
+print('Total items:', out.get('total_items'))
+print('Unique slugs:', out.get('unique_slugs'))
+print()
+print('Monthly items by title:', json.dumps(out.get('monthly_items', []), indent=2)[:2000])
+print()
+print('Monthly items by slug:', json.dumps(out.get('portfolio_monthly_by_slug', []), indent=2)[:2000])

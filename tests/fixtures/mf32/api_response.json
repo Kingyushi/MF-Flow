@@ -1,0 +1,138 @@
+{
+  "resultInfo": {
+    "resultStatus": "1",
+    "resultCode": "Success",
+    "resultMsg": "Data Fetched Successfully"
+  },
+  "data": [
+    {
+      "tabName": "Equity",
+      "tabId": 12,
+      "content": [
+        {
+          "disclosureId": "DISCLOSURE_001",
+          "disclosureHeader": 2,
+          "disclosureSection": "SECTION_747960037",
+          "disclosureTab": 12,
+          "pdfPath": "https://www.pgimindia.com/api/v1/brochure/about-us/image/PGIM India Small Cap Fund May 2026.xlsx",
+          "dateMonthYear": "31 May 2026",
+          "title": "PGIM India Small Cap Fund",
+          "date": "31",
+          "month": "May",
+          "year": "2026",
+          "displayStatus": true
+        },
+        {
+          "disclosureId": "DISCLOSURE_002",
+          "disclosureHeader": 2,
+          "disclosureSection": "SECTION_747960037",
+          "disclosureTab": 12,
+          "pdfPath": "https://www.pgimindia.com/api/v1/brochure/about-us/image/PGIM India Multi Cap Fund May 2026.xlsx",
+          "dateMonthYear": "31 May 2026",
+          "title": "PGIM India Multi Cap Fund",
+          "date": "31",
+          "month": "May",
+          "year": "2026",
+          "displayStatus": true
+        },
+        {
+          "disclosureId": "DISCLOSURE_003",
+          "disclosureHeader": 2,
+          "disclosureSection": "SECTION_747960037",
+          "disclosureTab": 12,
+          "pdfPath": "https://www.pgimindia.com/api/v1/brochure/about-us/image/PGIM India Midcap Fund May 2026.xlsx",
+          "dateMonthYear": "31 May 2026",
+          "title": "PGIM India Midcap Fund",
+          "date": "31",
+          "month": "May",
+          "year": "2026",
+          "displayStatus": true
+        },
+        {
+          "disclosureId": "DISCLOSURE_004",
+          "disclosureHeader": 2,
+          "disclosureSection": "SECTION_747960037",
+          "disclosureTab": 12,
+          "pdfPath": "https://www.pgimindia.com/api/v1/brochure/about-us/image/PGIM India Large Cap Fund May 2026.xlsx",
+          "dateMonthYear": "31 May 2026",
+          "title": "PGIM India Large Cap Fund",
+          "date": "31",
+          "month": "May",
+          "year": "2026",
+          "displayStatus": true
+        },
+        {
+          "disclosureId": "DISCLOSURE_005",
+          "disclosureHeader": 2,
+          "disclosureSection": "SECTION_747960037",
+          "disclosureTab": 12,
+          "pdfPath": "https://www.pgimindia.com/api/v1/brochure/about-us/image/PGIM India Large and Midcap Fund May 2026.xlsx",
+          "dateMonthYear": "31 May 2026",
+          "title": "PGIM India Large and Midcap Fund",
+          "date": "31",
+          "month": "May",
+          "year": "2026",
+          "displayStatus": true
+        },
+        {
+          "disclosureId": "DISCLOSURE_006",
+          "disclosureHeader": 2,
+          "disclosureSection": "SECTION_747960037",
+          "disclosureTab": 12,
+          "pdfPath": "https://www.pgimindia.com/api/v1/brochure/about-us/image/PGIM India Flexi Cap Fund May 2026.xlsx",
+          "dateMonthYear": "31 May 2026",
+          "title": "PGIM India Flexi Cap Fund",
+          "date": "31",
+          "month": "May",
+          "year": "2026",
+          "displayStatus": true
+        },
+        {
+          "disclosureId": "DISCLOSURE_007",
+          "disclosureHeader": 2,
+          "disclosureSection": "SECTION_747960037",
+          "disclosureTab": 12,
+          "pdfPath": "https://www.pgimindia.com/api/v1/brochure/about-us/image/PGIM India Equity Savings Fund May 2026.xlsx",
+          "dateMonthYear": "31 May 2026",
+          "title": "PGIM India Equity Savings Fund",
+          "date": "31",
+          "month": "May",
+          "year": "2026",
+          "displayStatus": true
+        },
+        {
+          "disclosureId": "DISCLOSURE_101",
+          "disclosureHeader": 2,
+          "disclosureSection": "SECTION_747960037",
+          "disclosureTab": 12,
+          "pdfPath": "https://www.pgimindia.com/api/v1/brochure/about-us/image/PGIM India Small Cap Fund April 2026.xlsx",
+          "dateMonthYear": "30 April 2026",
+          "title": "PGIM India Small Cap Fund",
+          "date": "30",
+          "month": "April",
+          "year": "2026",
+          "displayStatus": true
+        }
+      ]
+    },
+    {
+      "tabName": "Debt",
+      "tabId": 13,
+      "content": [
+        {
+          "disclosureId": "DISCLOSURE_201",
+          "disclosureHeader": 2,
+          "disclosureSection": "SECTION_747960037",
+          "disclosureTab": 13,
+          "pdfPath": "https://www.pgimindia.com/api/v1/brochure/about-us/image/PGIM India Liquid Fund May 2026.xlsx",
+          "dateMonthYear": "31 May 2026",
+          "title": "PGIM India Liquid Fund",
+          "date": "31",
+          "month": "May",
+          "year": "2026",
+          "displayStatus": true
+        }
+      ]
+    }
+  ]
+}

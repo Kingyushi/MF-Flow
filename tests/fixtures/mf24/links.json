@@ -1,0 +1,17 @@
+{
+  "years": ["2026", "2025", "2024", "2023"],
+  "months": ["January", "February", "March", "April", "May"],
+  "scheme_options": [
+    ["LICMF_FC", "LIC MF Flexi Cap Fund - Direct Plan - Growth"],
+    ["LICMF_LMC", "LIC MF Large & Midcap Fund - Direct Plan - Growth"],
+    ["LICMF_MC", "LIC MF Multicap Fund - Direct Plan - Growth"],
+    ["LICMF_FOC", "LICMF Focused Fund - Direct Plan - Growth"],
+    ["LICMF_MID", "LICMF Midcap Fund - Direct Plan - Growth"],
+    ["LICMF_SM", "LICMF Smallcap Fund - Direct Plan - Growth"],
+    ["LICMF_LC", "LICMF Largecap Fund - Direct Plan - Growth"],
+    ["LICMF_VAL", "LICMF Value Fund - Direct Plan - Growth"],
+    ["LICMF_TECH", "LIC MF Technology Fund - Direct Plan - Growth"],
+    ["LICMF_BAL", "LIC MF Balanced Advantage Fund - Direct Plan - Growth"],
+    ["LICMF_DIV", "LIC MF Dividend Yield Fund - Direct Plan - Growth"]
+  ]
+}

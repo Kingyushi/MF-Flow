@@ -1,0 +1,19 @@
+# Core runtime
+requests>=2.31
+openpyxl>=3.1
+python-dotenv>=1.0
+
+# Browser engine (most scrapers)
+playwright>=1.40
+playwright-stealth>=1.0.6
+
+# Akamai-bypass HTTP (mf13 Edelweiss, future Akamai sites). Uses real Chrome
+# TLS/JA3 fingerprint so requests pass where plain `requests` returns 403.
+curl_cffi>=0.7
+
+# AES + HMAC for Edelweiss response decryption (mf13). RSA POST encryption
+# for mf13 is done via a Node.js subprocess — see package.json.
+pycryptodome>=3.20
+
+# Dev / CI
+pytest>=7.4

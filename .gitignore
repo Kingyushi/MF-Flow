@@ -1,0 +1,14 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+output/
+output_backup_*/
+logs/
+reports/
+node_modules/
+.pytest_cache/
+tools/probe_out/
+_input_tmp.xlsx
+tests/fixtures/*/page.html
+tests/fixtures/*/screenshot.png

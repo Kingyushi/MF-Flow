@@ -415,11 +415,11 @@ string used for month inference.
   The `#Cbx_Category` select and View button IDs may change.
 
 ### mf40 — Tata Mutual Fund
-- **URL**: https://www.advisorkhoj.com/form-download-centre/Mutual/Tata-Mutual-Fund/Monthly-Portfolio-Disclosures
-- **Mechanism**: static_links (third-party advisorkhoj.com)
+- **URL**: https://www.tatamutualfund.com/schemes-related/portfolio (the AMC's own page; advisorkhoj.com dropped 2026-09-12 because it lagged the AMC by weeks)
+- **Mechanism**: static GET, parse the React Server Components payload (`self.__next_f.push([1,"..."])` chunks), no browser
 - **Pattern**: single_xlsx_multi_sheet
-- **Key DOM hooks**: link text matches `Monthly Portfolio Disclosure - <Month> <Year>`. URL path contains publication-month (data-month+1) — parse from text only, not href.
-- **As-of date**: 2026-06-08
+- **Key hooks**: `initialData` rows with `field_document_title` like `Portfolio as on 31st August, 2026` and `field_media_document` = betacms xlsx URL. Keep month-end title dates with an xls/xlsx URL and no scheme name in the title. URL folder is the publication month (data month + 1) — parse the date from the title only.
+- **As-of date**: 2026-09-12
 
 ### mf41 — Taurus Mutual Fund
 - **URL**: https://taurusmutualfund.com/monthly-portfolio
@@ -534,9 +534,48 @@ with May data; April folder still holds the rest.
   `lib/month_hint.py` letter-boundary fix (Capital Mind upload-hash misparse).
   `tools/audit_month_folders.py` finds/fixes phantom month folders.
 
+
+## 2026-09-12 — PGIM from the droplet, Tata from the AMC page
+
+- **mf32 PGIM** — the droplet run failed with `PGIM disclosure API HTTP 403`.
+  Root cause: PGIM's AWS load balancer/WAF answers 403 to EVERY request from
+  datacenter IPs (homepage, page, API, file downloads); the same requests pass
+  from a residential IP. Through the Bright Data residential proxy every GET
+  passes, but the proxy refuses POST (HTTP 402 `bad_endpoint: POST requests
+  are not allowed` in the account's no-KYC mode) and the disclosure list API
+  is POST-only (GET -> 405). Fix: the scraper keeps the POST API as the first
+  choice and falls back to the server-rendered Monthly-Portfolio page, which
+  is GET-only: its first ten cards carry `<label class="w-100 file-title">`
+  titles like `PGIM INDIA LARGE CAP FUND Aug 2026`, and the download URL is
+  exactly `API_BASE/about-us/image/<title>.xlsx` (verified for all 14
+  Equity-tab August-2026 entries). Tracked schemes beyond the ten rendered
+  cards (Multi Cap) are probed at the title-derived URL; a missing file
+  answers HTTP 204 + empty body, so probes insist on the PK signature and
+  are reported as download failures otherwise. When the direct page GET
+  fails and MF_FLOW_PROXY is set, the page and the files are retried
+  through the proxy automatically (`force_proxy` in lib/fetcher.py), so no
+  `.env` change is needed. Verified on the droplet 2026-09-12 as a cron-style
+  run (empty environment): 403 -> page fallback via proxy -> 6/6 August files.
+- **mf40 Tata** — the scraper read advisorkhoj.com (third-party aggregator),
+  which lags the AMC by weeks: Tata uploaded the August-2026 workbook on
+  8 Sep 2026 15:28 IST, advisorkhoj still listed July on 12 Sep. Rewritten to
+  read the AMC's own page `https://www.tatamutualfund.com/schemes-related/portfolio`
+  (Next.js). The list is not in the DOM: it sits in the React Server
+  Components payload (`self.__next_f.push([1,"..."])` script chunks) as
+  `initialData: [{field_title: "For the year 2026", field_document_title:
+  "Portfolio as on 31st August, 2026", field_media_document: <betacms xlsx
+  url>}, ...]` (197 rows back to 2010). Key on the TITLE date: month-end
+  dates with an xls/xlsx URL and no scheme name in the title (a fortnightly
+  scheme-level one-off exists for Dec 2017); href folders carry the
+  publication month (2026-09 for August data), never infer the month from
+  the URL. Static requests only; reachable from the droplet without a
+  proxy (files come from S3). Download is rejected unless it starts with
+  the xlsx/xls signature.
+
 Still open (no fix yet): **mf05 Axis** (CMS feed has no monthly consolidated
 file after May 2026 — monthly portfolio moved elsewhere), **mf25 Mahindra
 Manulife** (downloads page redesigned, no xlsx links), **mf22 JM** (Flexicap,
 Focused, Large & Midcap never match a link — 3/6), **mf21 Jio BlackRock** (only
 the Arbitrage workbook is fetched; Large Cap / Sector Rotation / Flexi Cap are
-not), **mf40 Tata** (advisorkhoj page lags the AMC by weeks).
+not), **mf28 Navi / mf46 WhiteOak** (HTTP 403 from the droplet IP, fine from
+a residential IP — not yet routed through the proxy).

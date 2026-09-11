@@ -64,9 +64,19 @@ def _should_proxy(host: str) -> bool:
     return any(host_l == h or host_l.endswith("." + h) for h in _PROXY_HOSTS)
 
 
-def _proxy_dict_for(host: str) -> dict | None:
-    """Return a requests-style proxy dict for `host`, or None for direct."""
-    if not _should_proxy(host):
+def proxy_available() -> bool:
+    """True iff MF_FLOW_PROXY is configured (a scraper may retry a blocked host through it)."""
+    return bool(_PROXY_URL)
+
+
+def _proxy_dict_for(host: str, *, force: bool = False) -> dict | None:
+    """Return a requests-style proxy dict for `host`, or None for direct.
+
+    `force=True` routes through MF_FLOW_PROXY even when `host` is not listed
+    in MF_FLOW_PROXY_HOSTS (scrapers use it to retry a host that blocks the
+    server's own IP). It is a no-op when no proxy is configured.
+    """
+    if not _should_proxy(host) and not (force and _PROXY_URL):
         return None
     return {"http": _PROXY_URL, "https": _PROXY_URL}
 
@@ -152,16 +162,16 @@ class StaticFetcher:
                 time.sleep(delay - elapsed)
         self._last_request_at[host] = time.monotonic()
 
-    def fetch_html(self, url: str, host: str) -> FetchResult:
+    def fetch_html(self, url: str, host: str, *, force_proxy: bool = False) -> FetchResult:
         self._polite(host)
         s = self._session(host)
         try:
             # When proxied via Bright Data, the proxy injects its own CA into
             # the TLS chain (SSL inspection), so verify must be off.
-            proxied = _should_proxy(host)
+            proxies = _proxy_dict_for(host, force=force_proxy)
             r = s.get(url, timeout=30, allow_redirects=True,
-                      proxies=_proxy_dict_for(host),
-                      verify=not proxied)
+                      proxies=proxies,
+                      verify=proxies is None)
             return FetchResult(
                 ok=r.ok,
                 url=url,
@@ -182,16 +192,21 @@ class StaticFetcher:
         *,
         referer: str = "",
         expected_signatures: tuple[bytes, ...] = (),
+        force_proxy: bool = False,
     ) -> bool:
-        """Download to dest. Return True on success. Optionally verify magic bytes."""
+        """Download to dest. Return True on success. Optionally verify magic bytes.
+
+        `force_proxy=True` routes through MF_FLOW_PROXY regardless of
+        MF_FLOW_PROXY_HOSTS (no-op when no proxy is configured).
+        """
         self._polite(host)
         s = self._session(host)
         try:
             extra = {"Referer": referer or f"https://{host}/", "Accept": "*/*"}
-            proxied = _should_proxy(host)
+            proxies = _proxy_dict_for(host, force=force_proxy)
             r = s.get(url, timeout=120, allow_redirects=True, stream=True, headers=extra,
-                      proxies=_proxy_dict_for(host),
-                      verify=not proxied)
+                      proxies=proxies,
+                      verify=proxies is None)
             if not r.ok:
                 log.warning("download_file %s -> HTTP %s", url, r.status_code)
                 return False

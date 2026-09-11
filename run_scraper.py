@@ -19,6 +19,7 @@ from lib.incremental_report import (                                  # noqa: E4
     write_run_incremental,
 )
 from lib.log import get_logger                                        # noqa: E402
+from lib.month_guard import check_discovered_month                    # noqa: E402
 from lib.organizer import (                                           # noqa: E402
     FileMeta,
     find_existing_month_for_mf,
@@ -80,6 +81,21 @@ def _scrape_one(mf: MFConfig, fetch, *, force: bool, dry_run: bool) -> ScrapeRep
 
     log.info("%s: site latest = %d-%02d (as_on=%s)", mf.name, latest.year, latest.month, latest.as_on_date)
 
+    # Plausibility guard (see lib/month_guard.py): a monthly portfolio for the
+    # current or a future month cannot exist yet. Rejecting here — BEFORE the
+    # download and BEFORE anything lands in output/ — prevents a mislabeled
+    # link (Abakkus daily TREPS file read as "August 2026") from poisoning the
+    # on-disk month marker, which would make every later run skip the real
+    # month. Applies to --force too: forcing a phantom month is still wrong.
+    ok, why = check_discovered_month(latest.year, latest.month, latest.as_on_date)
+    if not ok:
+        log.error("%s: DISCOVERY REJECTED — %s", mf.name, why)
+        return ScrapeReport(
+            mf_id=mf.id, mf_name=mf.name, outcome=ScrapeOutcome.ERROR,
+            previous_year=prev_year, previous_month=prev_month,
+            error=f"implausible discovery rejected: {why}",
+        )
+
     if pre and not force:
         if (latest.year, latest.month) <= pre:
             log.info("%s: skipping, on-disk=%s >= site=%d-%02d", mf.name, pre, latest.year, latest.month)
@@ -113,9 +129,18 @@ def _scrape_one(mf: MFConfig, fetch, *, force: bool, dry_run: bool) -> ScrapeRep
     # with its own _meta.json.
     placed: list[Path] = []
     cohort: dict[tuple[int, int], list[FileMeta]] = {}
+    rejected_files: list[str] = []
     for f in files:
         fy = f.year if f.year is not None else latest.year
         fm = f.month if f.month is not None else latest.month
+        # Same plausibility guard for per-file (year, month) overrides used by
+        # rolling per-scheme MFs — one bad per-file date must not create a
+        # phantom month folder either.
+        ok, why = check_discovered_month(fy, fm)
+        if not ok:
+            log.error("%s: file %r rejected — %s", mf.name, f.label, why)
+            rejected_files.append(f.label)
+            continue
         try:
             p = place_file(
                 f.src_path, mf.name, fy, fm,
@@ -160,6 +185,12 @@ def _scrape_one(mf: MFConfig, fetch, *, force: bool, dry_run: bool) -> ScrapeRep
     df = getattr(scraper, "_download_failures", None)
     if df:
         report.download_failures = list(df)
+    # Files rejected by the month plausibility guard surface as PARTIAL so the
+    # run summary is loud about them.
+    if rejected_files:
+        report.download_failures = list(report.download_failures) + [
+            f"{lbl} (implausible month rejected)" for lbl in rejected_files
+        ]
     return report
 
 

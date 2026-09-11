@@ -240,62 +240,104 @@ def _api_post(session, endpoint: str, body: dict, pem: str) -> dict:
     return data
 
 
+def _api_get_statutory_menu(session, menu_name: str = "Portfolio of scheme(s)") -> dict:
+    """=== 2026-07 MAINTENANCE FIX (API migration) ===
+
+    The SPA moved from the encrypted POST `third-party/getSingleStatutory`
+    (whose data froze around 2026-07-07) to a plain GET:
+
+        GET /mf/statutory-menus/single?type=Statutory&fundType=MF&menuName=Portfolio of scheme(s)
+
+    No RSA / hybrid-crypto-js / Node.js is needed for the request. The response
+    is the same CryptoJS AES envelope ({"body": "U2FsdGVk..."}), decrypted with
+    the HMAC passphrase derived from the x-timestamp / x-ip-address headers we
+    send. Decrypted shape: {"submenus": [...], "files": [{month, year,
+    fileTitle, filePath, subMenuName, ...}]} — note the lowercase keys.
+    """
+    ts = str(int(time.time() * 1000))
+    ip = STATIC_IP
+    key = _hmac_key(ip, ts)
+    url = f"{API_BASE}/mf/statutory-menus/single"
+    params = {"type": "Statutory", "fundType": "MF", "menuName": menu_name}
+    r = session.get(url, params=params, headers={"x-timestamp": ts, "x-ip-address": ip}, timeout=30)
+    log.info("GET statutory-menus/single -> %d", r.status_code)
+    if r.status_code != 200:
+        raise ScraperError(f"Edelweiss statutory-menus GET HTTP {r.status_code}: {r.text[:200]}")
+    envelope = r.json().get("body")
+    if not envelope or not isinstance(envelope, str):
+        raise ScraperError("Edelweiss statutory-menus: missing 'body' envelope")
+    try:
+        return json.loads(_cryptojs_decrypt(envelope, key).decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        raise ScraperError(f"Edelweiss statutory-menus decrypt/parse: {type(e).__name__}: {e}")
+
+
+def _pick_latest_monthly(files: list[dict]) -> dict:
+    """Newest 'Monthly Portfolio and Risk-o-Meter' entry by (year, month)."""
+    monthly = [
+        f for f in files
+        if "monthly portfolio" in str(f.get("subMenuName") or f.get("SubMenuName") or "").lower()
+    ]
+    if not monthly:
+        raise NoDataYetError("Edelweiss: no Monthly Portfolio entries in API response")
+
+    def _ym(item):
+        try:
+            y = int(item.get("year") or item.get("Year"))
+            m = _ALL_MONTHS[str(item.get("month") or item.get("Month")).strip().lower()]
+        except (KeyError, ValueError, AttributeError, TypeError):
+            return (0, 0, "")
+        return (y, m, str(item.get("createdOn") or item.get("Created_On") or ""))
+
+    return max(monthly, key=_ym)
+
+
 class Scraper(BaseScraper):
     PATTERN = "single_xlsx_multi_sheet"
 
     @retry(times=2, backoff=(5.0, 15.0))
     def discover_latest_month(self, fetcher: Fetcher) -> DiscoveryResult:
         s = _open_session()
-        pem = _fetch_pem(s)
 
-        # POST to getSingleStatutory to get file listings
-        data = _api_post(
-            s, "third-party/getSingleStatutory",
-            {"category": "portfolio-of-schemes"},
-            pem,
-        )
-
-        items = data.get("CommonDetails") or []
-        # MenuID 2 / SubMenuName 'Monthly Portfolio and Risk-o-Meter'
-        monthly = [
-            i for i in items
-            if str(i.get("MenuID")) == "2"
-            and "monthly portfolio" in (i.get("SubMenuName") or "").lower()
-        ]
-        if not monthly:
-            raise NoDataYetError(
-                "Edelweiss: no Monthly Portfolio entries in API response"
-            )
-
-        def _sortkey(item):
-            try:
-                y = int(item["Year"])
-                m = _ALL_MONTHS[item["Month"].lower()]
-            except (KeyError, ValueError, AttributeError, TypeError):
-                y, m = 0, 0
-            return (y, m, item.get("Created_On", ""))
-
-        latest = max(monthly, key=_sortkey)
+        # Preferred path (2026-07+): plain GET, no Node.js. Fall back to the
+        # legacy encrypted POST only if the GET path breaks.
         try:
-            year = int(latest["Year"])
-            month = _ALL_MONTHS[latest["Month"].lower()]
-        except (KeyError, ValueError, AttributeError, TypeError) as e:
-            raise ScraperError(
-                f"Edelweiss: cannot parse Year/Month from {latest}: {e}"
+            data = _api_get_statutory_menu(s)
+            files = data.get("files") or []
+            latest = _pick_latest_monthly(files)
+        except NoDataYetError:
+            raise
+        except Exception as e:
+            log.warning("Edelweiss GET path failed (%s); falling back to encrypted POST", e)
+            pem = _fetch_pem(s)
+            data = _api_post(
+                s, "third-party/getSingleStatutory",
+                {"category": "portfolio-of-schemes"},
+                pem,
             )
+            items = [i for i in (data.get("CommonDetails") or []) if str(i.get("MenuID")) == "2"]
+            latest = _pick_latest_monthly(items)
 
-        # Construct download URL
-        path = latest["FilePath"]
+        try:
+            year = int(latest.get("year") or latest.get("Year"))
+            month = _ALL_MONTHS[str(latest.get("month") or latest.get("Month")).strip().lower()]
+        except (KeyError, ValueError, AttributeError, TypeError) as e:
+            raise ScraperError(f"Edelweiss: cannot parse year/month from {latest}: {e}")
+
+        # Construct download URL (path segments may contain spaces)
+        path = latest.get("filePath") or latest.get("FilePath") or ""
+        if not path:
+            raise ScraperError(f"Edelweiss: entry has no filePath: {latest}")
         url = FILES_BASE + "/".join(quote(seg) for seg in path.split("/"))
 
         as_on: Optional[date] = parse_as_on(
-            latest.get("FileTitle", ""),
-            latest.get("SystemFileName", ""),
+            str(latest.get("fileTitle") or latest.get("FileTitle") or ""),
+            str(latest.get("systemFileName") or latest.get("SystemFileName") or ""),
         )
 
         self._session_obj = s
         self._download_url = url
-        self._label = latest.get("FileTitle") or "Monthly Portfolio"
+        self._label = latest.get("fileTitle") or latest.get("FileTitle") or "Monthly Portfolio"
         return DiscoveryResult(year=year, month=month, as_on_date=as_on)
 
     @retry(times=2, backoff=(5.0, 15.0))

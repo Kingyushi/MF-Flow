@@ -31,8 +31,12 @@ _PATTERNS_4DIGIT: list[re.Pattern[str]] = [
         rf"{_LB}(?P<month>{_MONTH_NAME_PAT})[ _\-.,]+(?P<year>20\d{{2}})(?![0-9])",
         re.IGNORECASE,
     ),
-    re.compile(r"(?<![0-9])(?P<year>20\d{2})[ _\-.]?(?P<mm>0[1-9]|1[0-2])(?![0-9])"),
-    re.compile(r"(?<![0-9])(?P<mm>0[1-9]|1[0-2])[ _\-.](?P<year>20\d{2})(?![0-9])"),
+    # Numeric YYYYMM / MM-YYYY forms. The month component must not butt up
+    # against a letter: upload-hash suffixes like "..._June_2026_11dcac4356"
+    # otherwise parse as year=2026 mm=11 (real incident: Capital Mind's June
+    # 2026 file was recorded as the phantom month "November 2026").
+    re.compile(r"(?<![0-9])(?P<year>20\d{2})[ _\-.]?(?P<mm>0[1-9]|1[0-2])(?![0-9A-Za-z])"),
+    re.compile(r"(?<![0-9A-Za-z])(?P<mm>0[1-9]|1[0-2])[ _\-.](?P<year>20\d{2})(?![0-9])"),
     # Day-Month-Year forms like "30 April 2026" or "30-Apr-2026"
     re.compile(
         rf"(?<![0-9])\d{{1,2}}[ _\-.,]+(?P<month>{_MONTH_NAME_PAT})[ _\-.,]+(?P<year>20\d{{2}})(?![0-9])",

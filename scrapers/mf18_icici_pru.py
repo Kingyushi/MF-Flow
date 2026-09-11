@@ -3,9 +3,21 @@
 The /media-center/downloads page is React + IP-blocked from cloud hosts, but
 the blob URL is open and predictable:
 
-    https://www.icicipruamc.com/blob/downloads/Files/Monthly%20Portfolio%20Disclosures/<yyyy>/<MonShort>/Monthly-Portfolio-Disclosure-<MonthFull>-<yyyy>.zip
+    https://www.icicipruamc.com/blob/downloads/Files/Monthly%20Portfolio%20Disclosures/<yyyy>/<MonFolder>/Monthly-Portfolio-Disclosure-<MonthFull>-<yyyy>.zip
 
 We probe URLs backward from the current month. First HTTP 200 wins.
+
+=== 2026-07 MAINTENANCE FIX (month-folder rename) ===
+Through May 2026 the month folder used the 3-letter abbreviation
+(`/2026/Apr/`, `/2026/May/`). The June 2026 upload sits under the FULL month
+name instead:
+
+    .../Monthly%20Portfolio%20Disclosures/2026/June/Monthly-Portfolio-Disclosure-June-2026.zip
+
+The old scraper probed only the 3-letter folder, got 404 for June, fell back
+to May and reported "still on May". FIX: probe BOTH folder spellings per
+month — 3-letter first (the long-standing shape), then full name. For May
+the two spellings coincide, so at most one extra HEAD per month is added.
 """
 from __future__ import annotations
 
@@ -33,14 +45,21 @@ from .patterns.zip_pattern import LatestMonthZipScraper
 log = get_logger("mf18")
 
 
-def _icici_url(year: int, month: int) -> str:
+def _icici_urls(year: int, month: int) -> list[str]:
+    """Candidate URLs for one month, in probe order (historic shape first)."""
     mon_short = MONTH_NAMES[month - 1][:3]
     mon_full = MONTH_NAMES[month - 1]
-    return (
-        f"https://www.icicipruamc.com/blob/downloads/Files/"
-        f"Monthly%20Portfolio%20Disclosures/{year}/{mon_short}/"
-        f"Monthly-Portfolio-Disclosure-{mon_full}-{year}.zip"
-    )
+    folders = [mon_short]
+    if mon_full != mon_short:
+        folders.append(mon_full)
+    return [
+        (
+            f"https://www.icicipruamc.com/blob/downloads/Files/"
+            f"Monthly%20Portfolio%20Disclosures/{year}/{folder}/"
+            f"Monthly-Portfolio-Disclosure-{mon_full}-{year}.zip"
+        )
+        for folder in folders
+    ]
 
 
 class Scraper(LatestMonthZipScraper):
@@ -53,14 +72,14 @@ class Scraper(LatestMonthZipScraper):
         H = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"}
         proxies = _proxy_dict_for("www.icicipruamc.com")
         for _ in range(6):
-            url = _icici_url(y, m)
-            try:
-                r = requests.head(url, timeout=10, allow_redirects=True, headers=H, proxies=proxies)
-                if r.status_code == 200:
-                    self._discovered_url = url
-                    return DiscoveryResult(year=y, month=m, as_on_date=date(y, m, 1))
-            except Exception:
-                pass
+            for url in _icici_urls(y, m):
+                try:
+                    r = requests.head(url, timeout=10, allow_redirects=True, headers=H, proxies=proxies)
+                    if r.status_code == 200:
+                        self._discovered_url = url
+                        return DiscoveryResult(year=y, month=m, as_on_date=date(y, m, 1))
+                except Exception:
+                    pass
             m -= 1
             if m == 0:
                 m = 12

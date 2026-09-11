@@ -503,3 +503,40 @@ with May data; April folder still holds the rest.
   No Playwright needed. File URL hashes (e.g. `_09eb8c14a2.xlsx`) can trick `try_infer` into false
   month matches, so month inference uses `doc_name` only (not file URLs).
 - **As-of date**: 2026-06-09
+
+---
+
+## Maintenance log — fixes applied 2026-09-12 (originally built July/August 2026)
+
+- **mf06 Bajaj Finserv** — from June 2026 the consolidated file is uploaded as
+  `.xls` (still OOXML) at the same constructed CDN URL. Scraper now probes
+  `.xlsx` then `.xls` per month. Diagnostic: WP media REST
+  `bajajamc.com/wp-json/wp/v2/media?search=...` via curl_cffi shows the exact
+  latest upload URL.
+- **mf18 ICICI Prudential** — from June 2026 the blob month folder uses the full
+  month name (`/2026/June/`), earlier months use 3 letters (`/2026/May/`).
+  Scraper now probes both spellings per month.
+- **mf31 Old Bridge** — from June 2026 monthly files have opaque names
+  (`OBFE_*.xlsx` Focused, `OBFX_*` Flexi Cap, `OBAF_*` Arbitrage). Scraper now
+  reads month + scheme from the row `aria-label` inside the "Monthly Portfolio"
+  tab pane. Arbitrage Fund is not in the scope xlsx.
+- **mf13 Edelweiss** — the encrypted POST `third-party/getSingleStatutory` froze
+  ~2026-07-07. Live site now calls
+  `GET mf/statutory-menus/single?type=Statutory&fundType=MF&menuName=Portfolio of scheme(s)`
+  (plain query params, no RSA / Node). Response is the same CryptoJS AES envelope
+  (`{"body": ...}`) decrypted with the HMAC passphrase from the
+  `x-timestamp`/`x-ip-address` headers; decrypted JSON is
+  `{"submenus": [...], "files": [{month, year, fileTitle, filePath, subMenuName}]}`
+  (lowercase keys). Filter `subMenuName == "Monthly Portfolio and Risk-o-Meter"`,
+  download `FILES_BASE + quoted filePath`. Old POST path kept as fallback only.
+- **Runner / lib** — universal month-plausibility guard (`lib/month_guard.py`,
+  applied in `run_scraper.py`), mf02 Abakkus scoped to `div#mpdOutput`, and
+  `lib/month_hint.py` letter-boundary fix (Capital Mind upload-hash misparse).
+  `tools/audit_month_folders.py` finds/fixes phantom month folders.
+
+Still open (no fix yet): **mf05 Axis** (CMS feed has no monthly consolidated
+file after May 2026 — monthly portfolio moved elsewhere), **mf25 Mahindra
+Manulife** (downloads page redesigned, no xlsx links), **mf22 JM** (Flexicap,
+Focused, Large & Midcap never match a link — 3/6), **mf21 Jio BlackRock** (only
+the Arbitrage workbook is fetched; Large Cap / Sector Rotation / Flexi Cap are
+not), **mf40 Tata** (advisorkhoj page lags the AMC by weeks).

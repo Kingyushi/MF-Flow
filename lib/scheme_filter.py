@@ -61,6 +61,11 @@ _COMPOUND_PAIRS = [
     ("large and mid cap", "largemidcap"),
     ("large & mid cap", "largemidcap"),
     ("large mid cap", "largemidcap"),
+    # "Midcap" written as one word (JM: "JM Large and Midcap Fund" in the
+    # user's xlsx vs "JM Large & Mid Cap Fund" on the site, 2026-09-25).
+    ("large and midcap", "largemidcap"),
+    ("large & midcap", "largemidcap"),
+    ("large midcap", "largemidcap"),
     ("mid and small cap", "midsmallcap"),
     ("mid & small cap", "midsmallcap"),
     ("mid small cap", "midsmallcap"),

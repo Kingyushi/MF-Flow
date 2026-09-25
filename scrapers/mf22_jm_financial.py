@@ -18,6 +18,7 @@ from pathlib import PurePosixPath
 
 from lib.log import get_logger
 from lib.month_hint import parse_as_on
+from lib.scheme_filter import match_schemes
 
 from .base import NoDataYetError
 from .patterns.per_scheme import PerSchemeXlsxScraper, SchemeEntry
@@ -70,11 +71,36 @@ class Scraper(PerSchemeXlsxScraper):
             raise NoDataYetError("JM Financial: no monthly portfolio links found")
         return max_ym, picks
 
+    # Pagination "next" controls, in the order JM has used them:
+    #   - rc-pagination (until Sep 2026)
+    #   - Ant Design ant-pagination (seen 2026-09-25: 5 rows per page, 243
+    #     pages, client-side — clicking "next" fires no request, the DOM just
+    #     re-renders, so a short wait is enough)
+    NEXT_SELECTORS = (
+        "li.rc-pagination-next:not(.rc-pagination-disabled) a",
+        "li.rc-pagination-next:not(.rc-pagination-disabled) button",
+        "li.ant-pagination-next:not(.ant-pagination-disabled) button",
+        "li.ant-pagination-next:not(.ant-pagination-disabled) a",
+        "li.ant-pagination-next:not(.ant-pagination-disabled)",
+    )
+    MAX_PAGES = 30
+
+    def _coverage(self, hrefs: list[tuple[str, str]]) -> int:
+        """How many of the user's schemes already have a monthly-portfolio link
+        among `hrefs`. Uses the same matcher as the download step, so a spelling
+        difference between the xlsx ("Large and Midcap") and the site ("Large &
+        Mid Cap") cannot make the walk stop early or run to the cap for nothing."""
+        pairs = [(_label_from_href(h), h) for _t, h in hrefs
+                 if ".xlsx" in h.lower() and "fortnight" not in h.lower()]
+        if not pairs:
+            return 0
+        return match_schemes(self.mf.schemes, pairs).matched_count
+
     def _collect_paginated_hrefs(self, page) -> list[tuple[str, str]]:
-        """JM's disclosures page shows ~5 entries per page via rc-pagination.
-        Walk pages until every user-listed scheme has been seen OR we hit a
-        hard cap (defensively, JM lists 100s of historical pages — we only
-        need the first handful to cover the latest month per scheme)."""
+        """JM's disclosures page shows ~5 entries per page. Walk pages (newest
+        first) until every user-listed scheme has been seen OR we hit a hard
+        cap (JM lists 100s of historical pages — the latest month per scheme
+        sits in the first few)."""
         all_hrefs: list[tuple[str, str]] = []
         seen_hrefs: set[str] = set()
 
@@ -88,41 +114,28 @@ class Scraper(PerSchemeXlsxScraper):
                     seen_hrefs.add(h)
                     all_hrefs.append((t, h))
 
-        wanted_keys = {_scheme_key(s) for s in self.mf.schemes}
-
-        def coverage() -> int:
-            seen_keys = set()
-            for _t, h in all_hrefs:
-                if ".xlsx" not in h.lower() or "fortnight" in h.lower():
-                    continue
-                seen_keys.add(_scheme_key(_label_from_href(h)))
-            return len(wanted_keys & seen_keys)
-
+        wanted = len(self.mf.schemes)
         harvest()
-        max_pages = 15
-        for _ in range(max_pages):
-            if coverage() >= len(wanted_keys):
+        pages_walked = 1
+        for _ in range(self.MAX_PAGES):
+            if self._coverage(all_hrefs) >= wanted:
                 break
-            advanced = page.evaluate("""
-                () => {
-                    const next = document.querySelector(
-                      'li.rc-pagination-next:not(.rc-pagination-disabled) a, '
-                      + 'li.rc-pagination-next:not(.rc-pagination-disabled) button'
-                    );
-                    if (next) { next.click(); return true; }
-                    return false;
-                }
-            """)
+            advanced = page.evaluate(
+                "(selectors) => { for (const s of selectors) { const el = document.querySelector(s);"
+                " if (el) { el.click(); return s; } } return null; }",
+                list(self.NEXT_SELECTORS),
+            )
             if not advanced:
                 break
             page.wait_for_timeout(2000)
             before = len(all_hrefs)
             harvest()
+            pages_walked += 1
             if len(all_hrefs) == before:
-                # No new links — site might have stopped responding
+                # No new links — last page, or the site stopped responding
                 break
-        log.info("JM: paginated %d unique hrefs, scheme coverage %d/%d",
-                 len(all_hrefs), coverage(), len(wanted_keys))
+        log.info("JM: walked %d page(s), %d unique hrefs, scheme coverage %d/%d",
+                 pages_walked, len(all_hrefs), self._coverage(all_hrefs), wanted)
         return all_hrefs
 
     def latest_month_label(self, page):

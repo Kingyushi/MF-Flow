@@ -34,6 +34,25 @@ def test_midcap_variants_match():
     assert report.matched_count == 1, f"unmatched: {report.unmatched_schemes}"
 
 
+def test_jm_large_and_midcap_one_word_variants_match():
+    """JM: user xlsx says 'JM Large and Midcap Fund', site files have said both
+    'JM Large and Midcap Fund' and 'JM Large & Mid Cap Fund' (2026-09-25).
+    All spellings must collapse to the same 'largemidcap' token, and the plain
+    'JM Large Cap Fund' must NOT match a large-and-midcap link."""
+    links = [
+        ("Monthly Portfolio - JM Large & Mid Cap Fund - Aug 31, 2026", "u-lmc"),
+        ("Monthly Portfolio - JM Large Cap Fund - Aug 31, 2026", "u-lc"),
+    ]
+    r = match_schemes(["Monthly Portfolio - JM Large and Midcap Fund", "Monthly Portfolio - JM Large Cap Fund"], links)
+    got = {m.scheme_name: m.link_url for m in r.matched}
+    assert got == {
+        "Monthly Portfolio - JM Large and Midcap Fund": "u-lmc",
+        "Monthly Portfolio - JM Large Cap Fund": "u-lc",
+    }
+    for variant in ("JM Large and Midcap Fund", "JM Large & Midcap Fund", "JM Large Midcap Fund", "JM Large and Mid Cap Fund"):
+        assert "largemidcap" in normalize(variant), variant
+
+
 def test_hdfc_large_vs_large_and_mid():
     """The critical trap: HDFC Large Cap must NOT steal the HDFC Large and
     Mid cap fund link, and vice-versa."""
